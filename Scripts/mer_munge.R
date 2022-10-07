@@ -5,41 +5,6 @@
 # NOTES: This script will read in and munge the OU/IM MSD for use with the SPT data
 # per requirements: pulling tot_num FY23 targets for HTS_TST, PREP_CT, PREP_NEW
 
-# LOCALS & SETUP ============================================================================
-
-  # Libraries
-    library(glitr)
-    library(glamr)
-    library(gisr)
-    library(Wavelength)
-    library(gophr)
-    library(tidyverse)
-    library(scales)
-    library(sf)
-    library(extrafont)
-    library(tidytext)
-    library(patchwork)
-    library(ggtext)
-    library(here)
-    library(googledrive)
-    
-    
-  
-  # Set paths  
-    data   <- "Data"
-    dataout <- "Dataout"
-    images  <- "Images"
-    graphs  <- "Graphics"
-   
-    merdata <- glamr::si_path("path_msd")
-    rasdata <- glamr::si_path("path_raster")
-    shpdata <- glamr::si_path("path_vector")
-    datim   <- glamr::si_path("path_datim")  
-     
-    
-  # Functions  
-  load_secrets()
-
 # LOAD DATA ============================================================================  
 
   #
