@@ -57,10 +57,14 @@ glamr::load_secrets()
              standardizeddisaggregate == "Total Numerator",
              fiscal_year == 2023) %>% 
       reshape_msd("semi-wide") %>% 
-      group_by(operatingunit, period, indicator) %>% 
+      group_by(country, period, indicator) %>% 
       summarise(targets = sum(targets, na.rm = T)) %>%
       mutate(rtk_need = case_when(indicator %in% c("HTS_TST","PrEP_NEW") ~ targets,
-                              indicator == "PrEP_CT" ~ (targets*2)))
+                              indicator == "PrEP_CT" ~ (targets*2))) %>% 
+      group_by(country, period) %>% 
+      summarise(across(c(targets, rtk_need), sum, na.rm = T)) %>% 
+      rename(Country = country)
+
   
   #save locally
   df1 %>% write_csv(file.path(dataout, "MSD_mermaid_ave.csv"))
@@ -69,10 +73,7 @@ glamr::load_secrets()
   drive_upload(media = "dataout/MSD_mermaid_ave.csv",
                path = as_id("1jWIHhL3m7omtrkhSw_Q6iEPx8-Oxl27d"),
                overwrite = T)
-      
 
-      
-  
 # VIZ ============================================================================
 
   #  
