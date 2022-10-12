@@ -45,8 +45,10 @@ load_secrets()
 
 mer_munge = here("Scripts", "mer_munge.R")
 spt_wrangling = here("Scripts", "spt_wrangling.R")
+joining = here("Scripts", "Joining MER and SPT.R")
 
 #### Run ============================================================================
 
 source(mer_munge)
 source(spt_wrangling)
+source(joining)
