@@ -4,6 +4,44 @@
 # DATE: 2022-10-06
 # NOTES: This script will read in and munge the OU/IM MSD for use with the SPT data
 # per requirements: pulling tot_num FY23 targets for HTS_TST, PREP_CT, PREP_NEW
+# add: rtks_needed
+
+# LOCALS & SETUP ============================================================================
+
+# Libraries
+library(glitr)
+library(glamr)
+library(gisr)
+library(Wavelength)
+library(gophr)
+library(tidyverse)
+library(scales)
+library(sf)
+library(extrafont)
+library(tidytext)
+library(patchwork)
+library(ggtext)
+library(here)
+library(googledrive)
+
+  
+
+# Set paths  
+data   <- "Data"
+dataout <- "Dataout"
+images  <- "Images"
+graphs  <- "Graphics"
+
+merdata <- glamr::si_path("path_msd")
+rasdata <- glamr::si_path("path_raster")
+shpdata <- glamr::si_path("path_vector")
+datim   <- glamr::si_path("path_datim")  
+ 
+
+# Functions  
+glamr::load_secrets()
+
+
 
 # LOAD DATA ============================================================================  
 
@@ -19,18 +57,23 @@
              standardizeddisaggregate == "Total Numerator",
              fiscal_year == 2023) %>% 
       reshape_msd("semi-wide") %>% 
-      group_by(operatingunit, period, indicator) %>% 
-      summarise(targets = sum(targets, na.rm = T))
+      group_by(country, period, indicator) %>% 
+      summarise(targets = sum(targets, na.rm = T)) %>%
+      mutate(rtk_need = case_when(indicator %in% c("HTS_TST","PrEP_NEW") ~ targets,
+                              indicator == "PrEP_CT" ~ (targets*2))) %>% 
+      group_by(country, period) %>% 
+      summarise(across(c(targets, rtk_need), sum, na.rm = T)) %>% 
+      rename(Country = country)
+
   
+  #save locally
   df1 %>% write_csv(file.path(dataout, "MSD_mermaid_ave.csv"))
   
+  #write to drive
   drive_upload(media = "dataout/MSD_mermaid_ave.csv",
                path = as_id("1jWIHhL3m7omtrkhSw_Q6iEPx8-Oxl27d"),
                overwrite = T)
-      
 
-      
-  
 # VIZ ============================================================================
 
   #  
