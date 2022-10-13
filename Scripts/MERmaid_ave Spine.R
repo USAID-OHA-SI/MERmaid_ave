@@ -23,6 +23,7 @@ library(patchwork)
 library(ggtext)
 library(here)
 library(googledrive)
+require(plotly)
 
 
 

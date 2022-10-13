@@ -65,6 +65,69 @@ write_csv(oct.stock.all, here("Data", "Total MER-SPT Crosswalk.csv"))
 
 #### VIZ ============================================================================
 
-  #  
+oct.stock.onhand = oct.stock.first %>% 
+  select(OU, Procured_Tests = Stock_on_Hand) %>%
+  filter(!duplicated(OU)) %>%
+  mutate(labels = "Stock on Hand")
+
+oct.stock.total = oct.stock.first %>% 
+  bind_rows(oct.stock.onhand) %>%
+  select(OU, labels = Procuring_Agency, Procured_Tests) %>%
+  group_by(OU) %>%
+  summarize(Procured_Tests = sum(Procured_Tests, na.rm = T)) %>%
+  mutate(labels = "All Tests",
+         parent = "") %>%
+  rename(Country = OU)
+  
+
+oct.stock.sunburst = oct.stock.first %>% 
+  select(OU, labels = Procuring_Agency, Procured_Tests) %>%
+  group_by(OU, labels) %>%
+  summarize(Procured_Tests = sum(Procured_Tests, na.rm = T)) %>%
+  bind_rows(oct.stock.onhand) %>%
+  rename(Country = OU) %>%
+  bind_rows(oct.stock.total) %>%
+  mutate(parent = case_when(
+    labels %in% c("TBD", "Country Government") ~ "Unreliable",
+    labels == "All Tests" ~ "",
+    TRUE ~ "Reliable"
+  ))
+
+oct.stock.reliable = oct.stock.sunburst %>%
+  filter(labels != "All Tests") %>%
+  mutate(reliable = case_when(
+    labels %in% c("TBD", "Country Government") ~ "Unreliable",
+    TRUE ~ "Reliable"
+  )) %>%
+  group_by(Country, reliable) %>%
+  summarize(Procured_Tests = sum(Procured_Tests, na.rm = T)) %>%
+  rename(labels = reliable) %>%
+  mutate(parent = "All Tests")
+
+# oct.stock.remaining = oct.stock.mer %>%
+#   rename(MER_target = Procured_Tests) %>%
+#   select(-labels) %>%
+#   right_join(oct.stock.reliable) %>%
+#   mutate(difference = Procured_Tests-MER_target) %>%
+#   select(Country, MER_target, Procured_Tests, labels, parent, difference) %>%
+#   mutate(labels = case_when(
+#     labels == "Unreliable" ~ "",
+#     labels == "Reliable" & difference>1 ~ "Potential Surplus",
+#     labels == "Reliable" & difference<1 ~ "Potential Deficit"
+#   )) %>%
+#   select(Country, MER_target, labels) %>%
+#   filter(labels !="")
+#   
+# oct.stock.remaining2 = oct.stock.reliable %>%
+#   group_by(Country) %>%
+#   summarize(Procured_Tests = sum(Procured_Tests, na.rm = T)) %>%
+#   left_join(oct.stock.remaining) %>%
+#   mutate(Procured_Tests = Procured_Tests-MER_target,
+#          parent = "") 
+  
+oct.stock.sunburst = oct.stock.sunburst %>%
+  bind_rows(oct.stock.reliable)
+
+
 
 #### SPINDOWN ============================================================================

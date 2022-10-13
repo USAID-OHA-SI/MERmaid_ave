@@ -1,0 +1,95 @@
+---
+title: ""
+author: ""
+date: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(tidyverse)
+require(plotly)
+require(here)
+load(here("Data", "workspace.10.13.RData"))
+```
+
+## Some sort of introduction
+
+Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
+
+```{r echo=F, message=F}
+country = "Burkina Faso"
+fy = 2023
+oct.stock.sunburst.country = oct.stock.sunburst %>%
+  filter(Country == country)
+tests.needed = oct.stock.agency$`Tests Needed`[oct.stock.agency$Country==country]%>%
+  as.integer()
+tests.local = oct.stock.agency$`Country Government`[oct.stock.agency$Country==country] %>%
+  as.integer()
+tests.planned = oct.stock.all$`Planned Tests`[oct.stock.all$Country==country] %>%
+  as.integer()
+tests.tbd = oct.stock.all$TBD[oct.stock.all$Country==country] %>%
+  as.integer()
+```
+
+## Planned Procurement of HIV Tests in `r country`
+
+`r country` has a MER target of `r prettyNum(tests.needed, big.mark =",", format = "fg")` HIV tests for Fiscal Year `r fy`. This includes all first course tests for patients who wish to know their status, patients beginning PrEP, and patients undergoing routine testing to remain on PrEP, who are assumed to spend an average of six months on the treatment and test twice. 
+
+As of the beginning of the fiscal year, various procuring bodies have committed to purchasing `r prettyNum(tests.planned, big.mark = ",")` tests, which is `r ifelse(tests.planned>=tests.needed, "sufficient", "insufficient")` to meet MER targets. `r ifelse(tests.tbd>0, paste0("A need for an additional ", prettyNum(tests.tbd, big.mark=","), " tests has been identified, but no procuring body has as of yet committed to purchasing them."), "")`
+
+```{r echo=F, message=F, out.width= "40%", fig.align = 'right'}
+tests.all <- oct.stock.sunburst.country$Procured_Tests[oct.stock.sunburst.country$labels=="All Tests"]
+success <- tests.planned >= tests.needed
+outer.ring = oct.stock.sunburst.country %>%
+  filter(!parent %in% c("All Tests", "")) %>%
+  select(labels, Procured_Tests)
+
+if(success==T){
+  inner.ring = data.frame(labels = c("Tests Needed", "Potential Surplus"),
+                          Procured_Tests = c(tests.needed, (tests.all-tests.needed)))
+} else {
+  inner.ring = data.frame(labels = c("Tests Needed"),
+                          Procured_Tests = c(tests.needed))
+  outer.ring = outer.ring %>%
+    bind_rows(data.frame(labels = c("Potential Shortfall"),
+                         Procured_Tests = c(tests.needed-tests.all)))
+}
+
+# Compute percentages
+inner.ring$fraction <- inner.ring$Procured_Tests*100 / sum(inner.ring$Procured_Tests)
+outer.ring$fraction <- outer.ring$Procured_Tests*100 / sum(outer.ring$Procured_Tests)
+
+inner.ring = inner.ring %>% mutate(ring = "inner")
+ring.data = outer.ring %>% mutate(ring = "outer") %>%
+  bind_rows(inner.ring) %>%
+  mutate(ring = factor(ring, levels = c("inner", "outer"))) %>%
+  mutate(labels = factor(labels, levels = c("Potential Surplus", "Tests Needed", "Potential Shortfall", "TBD", "Other", "Country Government", "Global Fund", "CDC", "USAID (all other)", "USAID/WCF", "Stock on Hand")))
+
+ggplot(ring.data, aes(x = ring, y = fraction, fill = labels)) +
+  geom_col() +
+  scale_fill_viridis_d() +
+  coord_polar("y") +
+  theme_void()
+
+```
+
+
+## Reliability or something
+
+More detailed top-line text about reliability and some caveats. Lorem ipsum, etc.
+
+`r ifelse(tests.local>0, paste0("Additionally, the host government of ", country, "has committed to purchasing ", prettyNum(tests.local, big.mark = ","), " of the above tests. Depending on local factors, that may or may not be reliable. Without those tests, the number of tests committed to being purchased is ", prettyNum((tests.planned-tests.local), big.mark = ","), " which is ", ifelse((tests.planned-tests.local)>=tests.needed, "sufficient", "insufficient"), " to meet MER targets.",""))`
+
+```{r echo=F, message=F, out.width= "40%"}
+
+plot_ly(oct.stock.sunburst.country,
+  parents = ~parent,
+  labels = ~labels,
+  values = ~Procured_Tests,
+  type = 'sunburst',
+  branchvalues = 'total'
+)
+
+
+```
