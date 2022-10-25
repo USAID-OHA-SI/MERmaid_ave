@@ -10,16 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 require(tidyverse)
 require(plotly)
 require(here)
-load(here("Data", "workspace.10.13.RData"))
+require(gagglr)
+#load(here("Data", "workspace.10.21.RData"))
 ```
 
-## Some sort of introduction
+## Objectives and Introduction
 
-Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
+An ubiquitous question across the PEPFAR community has long been, “Are the commodities available sufficient to meet our programmatic goals?” This report seeks to answer that very question regarding the first test in the testing algorithm, considering the needs for this RTK among those who want to be tested for HIV as well as those starting and continuing PrEP. 
 
 ```{r echo=F, message=F}
-country = "Burkina Faso"
-fy = 2023
 oct.stock.sunburst.country = oct.stock.sunburst %>%
   filter(Country == country)
 tests.needed = oct.stock.agency$`Tests Needed`[oct.stock.agency$Country==country]%>%
@@ -30,66 +29,148 @@ tests.planned = oct.stock.all$`Planned Tests`[oct.stock.all$Country==country] %>
   as.integer()
 tests.tbd = oct.stock.all$TBD[oct.stock.all$Country==country] %>%
   as.integer()
+tests.reliable = oct.stock.sunburst.country$Procured_Tests[oct.stock.sunburst.country$labels=="Reliable"] %>%
+  as.integer()
 ```
 
-## Planned Procurement of HIV Tests in `r country`
+```{r echo=F, message=F, out.width= "50%", out.extra='style="float:right; padding:10px"'}
 
-`r country` has a MER target of `r prettyNum(tests.needed, big.mark =",", format = "fg")` HIV tests for Fiscal Year `r fy`. This includes all first course tests for patients who wish to know their status, patients beginning PrEP, and patients undergoing routine testing to remain on PrEP, who are assumed to spend an average of six months on the treatment and test twice. 
+consumption_rate_country = monthly.planned$Consumption_Rate[monthly.planned$OU==country][1]
 
-As of the beginning of the fiscal year, various procuring bodies have committed to purchasing `r prettyNum(tests.planned, big.mark = ",")` tests, which is `r ifelse(tests.planned>=tests.needed, "sufficient", "insufficient")` to meet MER targets. `r ifelse(tests.tbd>0, paste0("A need for an additional ", prettyNum(tests.tbd, big.mark=","), " tests has been identified, but no procuring body has as of yet committed to purchasing them."), "")`
-
-```{r echo=F, message=F, out.width= "40%", fig.align = 'right'}
-tests.all <- oct.stock.sunburst.country$Procured_Tests[oct.stock.sunburst.country$labels=="All Tests"]
-success <- tests.planned >= tests.needed
-outer.ring = oct.stock.sunburst.country %>%
-  filter(!parent %in% c("All Tests", "")) %>%
-  select(labels, Procured_Tests)
-
-if(success==T){
-  inner.ring = data.frame(labels = c("Tests Needed", "Potential Surplus"),
-                          Procured_Tests = c(tests.needed, (tests.all-tests.needed)))
-} else {
-  inner.ring = data.frame(labels = c("Tests Needed"),
-                          Procured_Tests = c(tests.needed))
-  outer.ring = outer.ring %>%
-    bind_rows(data.frame(labels = c("Potential Shortfall"),
-                         Procured_Tests = c(tests.needed-tests.all)))
-}
-
-# Compute percentages
-inner.ring$fraction <- inner.ring$Procured_Tests*100 / sum(inner.ring$Procured_Tests)
-outer.ring$fraction <- outer.ring$Procured_Tests*100 / sum(outer.ring$Procured_Tests)
-
-inner.ring = inner.ring %>% mutate(ring = "inner")
-ring.data = outer.ring %>% mutate(ring = "outer") %>%
-  bind_rows(inner.ring) %>%
-  mutate(ring = factor(ring, levels = c("inner", "outer"))) %>%
-  mutate(labels = factor(labels, levels = c("Potential Surplus", "Tests Needed", "Potential Shortfall", "TBD", "Other", "Country Government", "Global Fund", "CDC", "USAID (all other)", "USAID/WCF", "Stock on Hand")))
-
-ggplot(ring.data, aes(x = ring, y = fraction, fill = labels)) +
-  geom_col() +
-  scale_fill_viridis_d() +
-  coord_polar("y") +
-  theme_void()
-
-```
-
-
-## Reliability or something
-
-More detailed top-line text about reliability and some caveats. Lorem ipsum, etc.
-
-`r ifelse(tests.local>0, paste0("Additionally, the host government of ", country, "has committed to purchasing ", prettyNum(tests.local, big.mark = ","), " of the above tests. Depending on local factors, that may or may not be reliable. Without those tests, the number of tests committed to being purchased is ", prettyNum((tests.planned-tests.local), big.mark = ","), " which is ", ifelse((tests.planned-tests.local)>=tests.needed, "sufficient", "insufficient"), " to meet MER targets.",""))`
-
-```{r echo=F, message=F, out.width= "40%"}
-
-plot_ly(oct.stock.sunburst.country,
-  parents = ~parent,
-  labels = ~labels,
-  values = ~Procured_Tests,
-  type = 'sunburst',
-  branchvalues = 'total'
-)
+monthly.planned %>%
+  pivot_longer(cols = c(October_2022, 
+                        November_2022,
+                        December_2022,
+                        January_2023,
+                        February_2023,
+                        March_2023,
+                        April_2023,
+                        May_2023,
+                        June_2023,
+                        July_2023,
+                        August_2023,
+                        September_2023,
+                        October_2023,
+                        November_2023,
+                        December_2023),
+               names_to = "Month",
+               values_to = "Stock") %>%
+  mutate(Month = str_replace_all(Month, "_", " ")) %>%
+  mutate(Month = factor(Month, levels = c("October 2022", 
+                        "November 2022",
+                        "December 2022",
+                        "January 2023",
+                        "February 2023",
+                        "March 2023",
+                        "April 2023",
+                        "May 2023",
+                        "June 2023",
+                        "July 2023",
+                        "August 2023",
+                        "September 2023",
+                        "October 2023",
+                        "November 2023",
+                        "December 2023"))) %>%
+  filter(OU == country) %>% 
+  ggplot(aes(x = Month, y = Stock, group = TBD, color = TBD)) +
+  geom_area(aes(fill=TBD), position = 'identity', linetype = 1, color = "black") +
+  scale_fill_manual(values = c("#FD9873", "#A5C5FF")) +
+  scale_y_continuous(labels = scales::comma) +
+  geom_hline(aes(yintercept = consumption_rate_country), color="#FC7A83", linetype = "dashed", size = 1) +
+  geom_hline(aes(yintercept = consumption_rate_country*3), color="#FCCE52", linetype = "dashed", size = 1) +
+  si_style() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        plot.caption = element_text(hjust = 0)) + 
+  labs(caption = "Yellow line indicates that between two and three months of stock are remaining.\n Red line indicates that less than one month of stock is remaining.", align = "left") +
+  guides(fill=guide_legend(title="Unfunded Restocks"))
 
 
 ```
+
+## Planned Procurement of HIV Tests for `r country`
+
+Based on `r country` MER targets for HTS_TST, PrEP_CT, and PrEP_NEW, the PEPFAR program requires `r prettyNum(tests.needed, big.mark =",", format = "fg")` of the first RTK in the HIV testing algorithm for Fiscal Year `r fy`. This includes all first course tests for patients who wish to know their status, patients beginning PrEP, and patients undergoing routine testing to remain on PrEP, who are assumed to spend an average of six months on the treatment and test twice, once just before PrEP is initiated and once at the first refill. 
+
+As of the beginning of the fiscal year, various procuring bodies have committed to purchasing `r prettyNum(tests.planned, big.mark = ",")` tests, which is `r ifelse(tests.planned>=tests.needed, "sufficient", "insufficient")` to meet MER targets, `r ifelse(tests.planned>=tests.needed, "but", "and")` may not be sufficient to for the country's targets. `r ifelse(tests.tbd>0, paste0("A need for an additional ", prettyNum(tests.tbd, big.mark=","), " tests has been identified, but no procuring body has as of yet committed to purchasing them."), "")` `r ifelse(tests.local>0, paste0("The host country has committed to procuring ", prettyNum(tests.local, big.mark = ","), " of the above test."), "")`
+
+```{r echo=F, message=F, out.width= "60%", out.extra='style="float:left; padding:10px"'}
+
+oct.stock.circle = oct.stock.agency %>% 
+  select(-`First Test`) %>%
+  pivot_longer(cols = c("Stock on Hand", "Global Fund", "USAID/WCF", "TBD", "Country Government", "Other", "CDC", "USAID (all other)"), names_to = "Procuring Agency", values_to = "Tests") %>%
+  mutate(Funding = case_when(
+    `Procuring Agency` %in% c("Stock on Hand", "Global Fund", "USAID/WCF", "CDC", "USAID (all other)") ~ "Known Funding",
+    `Procuring Agency` %in% c("TBD", "Country Government", "Other") ~ "Unknown Funding"
+  )) %>%
+  filter(Country == country) %>%
+  ungroup() %>%
+  select(-`Tests Needed`, -Country)
+
+oct.stock.circle.1 = oct.stock.circle %>%
+  select(label = `Procuring Agency`, value = Tests) %>%
+  mutate(ring = "Procuring Agency") 
+
+oct.stock.circle.2 = oct.stock.circle %>%
+  select(label = Funding, value = Tests) %>%
+  group_by(label) %>%
+  summarize(value = sum(value, na.rm = T)) %>%
+  mutate(ring = "Funding")
+
+oct.stock.circle.3 = data.frame("label" = "MER Target",
+                                "value" = tests.needed,
+                                "ring" = "Tests Needed")
+
+oct.stock.circle = oct.stock.circle.1 %>%
+  bind_rows(oct.stock.circle.2) %>%
+  bind_rows(oct.stock.circle.3) %>%
+  mutate(label = factor(label, levels = rev(c("Stock on Hand", "USAID/WCF", "USAID (all other)", "CDC", "Global Fund", "TBD", "Country Government", "Other", "Known Funding", "Unknown Funding", "MER Target"))))
+
+color.values = data.frame("labels" = c("Known Funding", 
+                                       "Stock on Hand", 
+                                       "USAID/WCF", 
+                                       "USAID (all other)", 
+                                       "CDC", 
+                                       "Global Fund", 
+                                       "Unknown Funding", 
+                                       "TBD", 
+                                       "Country Government",  
+                                       "Other", 
+                                       "MER Target"),
+                          "values" = c(si_palettes$genoas[7], 
+                                       si_palettes$genoas[1],
+                                       si_palettes$genoas[2], 
+                                       si_palettes$genoas[3], 
+                                       si_palettes$genoas[4],
+                                       si_palettes$genoas[5],
+                                       si_palettes$old_roses[7],
+                                       si_palettes$old_roses[1], 
+                                       si_palettes$old_roses[3],
+                                       si_palettes$old_roses[5], 
+                                       si_palettes$trolley_greys[3])) %>%
+  filter(labels %in% oct.stock.circle$label[oct.stock.circle$value!=0]) %>%
+  pivot_wider(names_from = labels, values_from = values) %>%
+  as.pairlist()
+  
+oct.stock.circle %>%
+  filter(value!=0) %>%
+  ggplot(aes(y = value, x = ring, fill = label)) +
+  geom_col(color = "black") +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = prettyNum(round(value/1000), big.mark = ",")),
+            position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = color.values) +
+  theme(panel.background = element_rect(fill = "white"),
+        panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank()) +
+  labs(fill = "Tests (in thousands)")
+
+  
+
+
+```
+
+## Known and Unknown Funding Status
+
+The quantity of tests supported or not supported is summarized here. If an order has been funded in the COP, that order is regarded as having known funding. If an order is claimed by a procurement services agent which does not regularly share budget and/or procurement data then those are categorized as unknown funding status. Any order that is listed as a TBD falls into the unknown funding status automatically. Moreover, TBD orders should be treated as risks to the program’s ability to provide testing services. If the quantity included in the unknown funding category is not procured, then the number of the first RTK in the algorithm that are committed to being purchased is `r prettyNum(tests.reliable, big.mark = ",")` which `r ifelse(tests.reliable >= tests.needed, "is", "is not")` sufficient to meet MER targets`r ifelse(tests.reliable >= tests.needed, ", but may still be insufficient to meet", " and likely")` national targets.

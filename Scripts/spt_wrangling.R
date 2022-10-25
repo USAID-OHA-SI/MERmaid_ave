@@ -28,6 +28,8 @@ cop22.proc = procure.data %>%
   filter(Funded_by_Year == "COP22",
          Minor_Category == "HIV Tests") %>%
   select(OU,
+         Calendar_Year,
+         Month,
          Procuring_Agency,
          Status,
          Minor_Category,
@@ -50,7 +52,8 @@ oct.stock.join = oct.stock %>%
          Initial_Stock,
          Stock_on_Hand,
          Months_of_Stock,
-         Projected_Shortfall)
+         Projected_Shortfall,
+         Consumption_Rate)
 
 oct.stock.proc = cop22.proc %>%
   left_join(oct.stock.join, by = c("OU" = "OU",

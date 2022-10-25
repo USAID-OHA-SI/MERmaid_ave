@@ -24,7 +24,8 @@ library(ggtext)
 library(here)
 library(googledrive)
 require(plotly)
-
+require(xlsx)
+require(readxl)
 
 
 # Set paths  
@@ -47,9 +48,19 @@ load_secrets()
 mer_munge = here("Scripts", "mer_munge.R")
 spt_wrangling = here("Scripts", "spt_wrangling.R")
 joining = here("Scripts", "Joining MER and SPT.R")
+report = here("Scripts", "MERmaid_reports.Rmd")
 
 #### Run ============================================================================
 
 source(mer_munge)
 source(spt_wrangling)
 source(joining)
+
+for(n in unique(oct.stock.first$OU)){
+  country = n
+  fy = 2023
+  filename = paste0("MERmaid_report_",country,".html")
+  rmarkdown::render(report, output_file = here("Dataout", filename))
+}
+
+

@@ -11,7 +11,9 @@ mer_df = read_csv(here("Data", "MSD_mermaid_ave_cty.csv")) %>%
   select(OU = Country, `Tests Needed` = rtk_need)
 algo_ft = read_csv(here("Data", "first_test_algo.csv"))
 
-#### DATA WRANGLING - First Test ============================================================================
+#### DATA WRANGLING ============================================================================
+
+# Merge Item and Specify Other in oct.stock.proc and cut out Ukraine and PNG
 oct.stock.proc2 = oct.stock.proc %>%
   mutate(Item = case_when(
     is.na(Specify_other) ~ Item,
@@ -19,8 +21,8 @@ oct.stock.proc2 = oct.stock.proc %>%
   )) %>%
   filter(OU != "Papua New Guinea" & OU != "Ukraine")
 
+# Limit to the first test in the testing algorithm
 oct.stock.first = tibble()
-
 for(n in 1:length(algo_ft$Country)){
   temp = oct.stock.proc2 %>%
     filter(OU == algo_ft$Country[n])
@@ -32,7 +34,118 @@ for(n in 1:length(algo_ft$Country)){
   }
 }
 
-#### DATA WRANGLING - Agency ============================================================================
+# Create a dataset with country, baseline, and the number of tests arriving per month, by committed or TBD
+monthly.oct.stock = oct.stock.first %>%
+  select(OU, Calendar_Year, Month, Procuring_Agency, Procured_Tests, Stock_on_Hand, Consumption_Rate, multiplier) %>%
+  mutate(Stock_on_Hand = Stock_on_Hand*multiplier,
+         Consumption_Rate = Consumption_Rate*multiplier,
+         n = row_number()) %>%
+  pivot_wider(id_cols = c("n", "OU", "Procuring_Agency", "Stock_on_Hand", "Consumption_Rate"), 
+              names_from = c("Month", "Calendar_Year"), 
+              values_from = Procured_Tests, 
+              values_fill = 0) %>%
+  select(OU, 
+         Procuring_Agency, 
+         Stock_on_Hand, 
+         Consumption_Rate,
+         October_2022,
+         November_2022,
+         December_2022,
+         January_2023, 
+         February_2023, 
+         March_2023, 
+         April_2023, 
+         May_2023, 
+         June_2023, 
+         July_2023, 
+         August_2023, 
+         September_2023, 
+         October_2023, 
+         November_2023, 
+         December_2023)
+
+#### Tests Running Total ============================================================================
+  
+# Without TBD
+monthly.planned = monthly.oct.stock %>%
+  filter(Procuring_Agency != "TBD")
+
+monthly.planned = monthly.planned %>%
+  group_by(OU, Stock_on_Hand, Consumption_Rate) %>%
+  summarize(October_2022 = sum(October_2022, na.rm = T),
+            November_2022 = sum(November_2022, na.rm = T),
+            December_2022 = sum(December_2022, na.rm = T),
+            January_2023 = sum(January_2023, na.rm = T),
+            February_2023 = sum(February_2023, na.rm = T),
+            March_2023 = sum(March_2023, na.rm = T),
+            April_2023 = sum(April_2023, na.rm = T),
+            May_2023 = sum(May_2023, na.rm = T),
+            June_2023 = sum(June_2023, na.rm = T),
+            July_2023 = sum(July_2023, na.rm = T),
+            August_2023 = sum(August_2023, na.rm = T),
+            September_2023 = sum(September_2023, na.rm = T),
+            October_2023 = sum(October_2023, na.rm = T),
+            November_2023 = sum(November_2023, na.rm = T),
+            December_2023 = sum(December_2023, na.rm = T)
+            ) %>%
+  mutate(October_2022 = October_2022+Stock_on_Hand) %>%
+  select(-Stock_on_Hand)
+
+for(n in 1:length(monthly.planned$OU)){
+  for(m in 5:length(monthly.planned)){
+    monthly.planned[n,m] <- monthly.planned[n,m] + monthly.planned[n,m-1] - monthly.planned$Consumption_Rate[n]
+    if(monthly.planned[n,m]<0){
+      monthly.planned[n,m]=0
+    }
+  }
+}
+
+monthly.planned = monthly.planned %>%
+  ungroup() %>%
+  select(-Stock_on_Hand) %>%
+  mutate(TBD = "Not Included")
+
+# With TBD
+
+monthly.planned.TBD = monthly.oct.stock %>%
+  group_by(OU, Stock_on_Hand, Consumption_Rate) %>%
+  summarize(October_2022 = sum(October_2022, na.rm = T),
+            November_2022 = sum(November_2022, na.rm = T),
+            December_2022 = sum(December_2022, na.rm = T),
+            January_2023 = sum(January_2023, na.rm = T),
+            February_2023 = sum(February_2023, na.rm = T),
+            March_2023 = sum(March_2023, na.rm = T),
+            April_2023 = sum(April_2023, na.rm = T),
+            May_2023 = sum(May_2023, na.rm = T),
+            June_2023 = sum(June_2023, na.rm = T),
+            July_2023 = sum(July_2023, na.rm = T),
+            August_2023 = sum(August_2023, na.rm = T),
+            September_2023 = sum(September_2023, na.rm = T),
+            October_2023 = sum(October_2023, na.rm = T),
+            November_2023 = sum(November_2023, na.rm = T),
+            December_2023 = sum(December_2023, na.rm = T)
+  ) %>%
+  mutate(October_2022 = October_2022+Stock_on_Hand) %>%
+  select(-Stock_on_Hand)
+
+for(n in 1:length(monthly.planned.TBD$OU)){
+  for(m in 5:length(monthly.planned.TBD)){
+    monthly.planned.TBD[n,m] <- monthly.planned.TBD[n,m] + monthly.planned.TBD[n,(m-1)] - monthly.planned.TBD$Consumption_Rate[n]
+    if(monthly.planned.TBD[n,m]<0){
+      monthly.planned.TBD[n,m]=0
+    }
+  }
+}
+
+monthly.planned.TBD = monthly.planned.TBD %>%
+  ungroup() %>%
+  select(-Stock_on_Hand) %>%
+  mutate(TBD = "Included")
+
+monthly.planned = monthly.planned %>%
+  bind_rows(monthly.planned.TBD)
+
+#### Agency ============================================================================
 
 oct.stock.agency = oct.stock.first %>% 
   select(OU, Procuring_Agency, Item, Stock_on_Hand, Procured_Tests) %>%
@@ -48,7 +161,7 @@ oct.stock.agency = oct.stock.agency %>%
          `First Test` = Item,
          `Stock on Hand` = Stock_on_Hand)
 
-#### DATA WRANGLING - All ============================================================================
+#### All Together ============================================================================
 
 oct.stock.all = oct.stock.agency %>% 
   mutate(`Planned Tests` = `Global Fund`+`USAID/WCF`+`Country Government`+CDC+Other+`USAID (all other)`) %>%
